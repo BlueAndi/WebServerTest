@@ -1,0 +1,30 @@
+body {
+    color: white;
+    background-color: #202020;
+}
+
+main > .container {
+    padding: 60px 15px 0;
+}
+
+.header {
+    background-color: #333;
+}
+
+.footer {
+    background-color: #202020;
+    text-align: center;
+}
+
+.footer > .container a {
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+.footer > .container hr {
+    border-color: white;
+}
+
+code {
+    font-size: 80%;
+}
