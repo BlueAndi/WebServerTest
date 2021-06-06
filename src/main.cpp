@@ -80,6 +80,9 @@ static const char*      NETWORK_HOSTNAME        = "webservertest";
 /** Flag, which shows the current wifi connection state. */
 static bool             gIsWiFiConnected        = false; 
 
+/** Count every download of test data. */
+static uint32_t         gNumberOfDownloads      = 0U;
+
 /******************************************************************************
  * External functions
  *****************************************************************************/
@@ -108,7 +111,8 @@ void setup()
     (void)gWebServer.on("/testData/TEST300k.cam", HTTP_GET, 
         [](AsyncWebServerRequest* request)
         {
-            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "300k test data requested.");
+            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "%u - 300k test data requested.", gNumberOfDownloads);
+            ++gNumberOfDownloads;
 
             if (nullptr != request)
             {

@@ -1,7 +1,7 @@
 # WebServerTest
 It will connect to a wifi network and setup up a webserver with test data.
 
-## Preparation of target
+## Preparation of target software
 1. Open ```/src/main.cpp``` and set
    1. ```WIFI_STATION_SSID``` to your wifi network SSID and
    2. ```WIFI_STATION_PASSWORD``` to your wifi network password.
