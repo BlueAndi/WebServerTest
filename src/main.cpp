@@ -42,6 +42,9 @@
  * Macros
  *****************************************************************************/
 
+/** Get number of elements in array. */
+#define MAIN_ARRAY_NUM(__arr)   (sizeof(__arr)/sizeof((__arr)[0]))
+
 /******************************************************************************
  * Types and Classes
  *****************************************************************************/
@@ -57,31 +60,37 @@ static void main_handlePageNotFound(AsyncWebServerRequest *request);
  *****************************************************************************/
 
 /** Logging module. */
-static const char*      LOG_MODULE              = "main";
+static const char*              LOG_MODULE              = "main";
 
 /** Serial interface baudrate. */
-static const uint32_t   SERIAL_BAUDRATE         = 115200U;
+static const uint32_t           SERIAL_BAUDRATE         = 115200U;
 
 /** Webserver port */
-static const uint32_t   WEBSERVER_PORT          = 80U;
+static const uint32_t           WEBSERVER_PORT          = 80U;
 
 /** Web server */
-static AsyncWebServer   gWebServer(WEBSERVER_PORT);
+static AsyncWebServer           gWebServer(WEBSERVER_PORT);
 
 /** WiFi station SSID, which to connect to. */
-static const char*      WIFI_STATION_SSID       = "...";
+static const char*              WIFI_STATION_SSID       = "...";
 
 /** WiFi station password. */
-static const char*      WIFI_STATION_PASSWORD   = "...";
+static const char*              WIFI_STATION_PASSWORD   = "...";
 
 /** Network hostname */
-static const char*      NETWORK_HOSTNAME        = "webservertest";
+static const char*              NETWORK_HOSTNAME        = "webservertest";
 
 /** Flag, which shows the current wifi connection state. */
-static bool             gIsWiFiConnected        = false; 
+static bool                     gIsWiFiConnected        = false; 
 
 /** Count every download of test data. */
-static uint32_t         gNumberOfDownloads      = 0U;
+static uint32_t                 gNumberOfDownloads      = 0U;
+
+/** Path to all test data. */
+static const char*              TEST_DATA_PATH          = "/testData/";
+
+/** Deferred web request. */
+static AsyncWebServerRequest*   gDeferredReq            = nullptr;
 
 /******************************************************************************
  * External functions
@@ -107,16 +116,31 @@ void setup()
     (void)gWebServer.serveStatic("/js/", SPIFFS, "/js/", "max-age=3600");
     (void)gWebServer.serveStatic("/style/", SPIFFS, "/style/", "max-age=3600");
 
-    /* Register test data explicit. */
-    (void)gWebServer.on("/testData/TEST300k.cam", HTTP_GET, 
+    /* Register test data in different ways:
+     *
+     * Use case 1 (uc1): Download in the webserver context.
+     * Use case 2 (uc2): Download in main loop context.
+     */
+    (void)gWebServer.on("/download/uc1/*", HTTP_GET, 
         [](AsyncWebServerRequest* request)
         {
-            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "%u - 300k test data requested.", gNumberOfDownloads);
+            String filename = request->url().substring(request->url().lastIndexOf("/") + 1U);
+            String path     = TEST_DATA_PATH + filename;
+            
             ++gNumberOfDownloads;
+            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "%u - %s requested (uc1).", gNumberOfDownloads, path.c_str());
 
             if (nullptr != request)
             {
-                request->send(SPIFFS, "/testData/TEST300k.cam", String(), true);
+                request->send(SPIFFS, path, String(), true);
+            }
+        });
+    (void)gWebServer.on("/download/uc2/*", HTTP_GET, 
+        [](AsyncWebServerRequest* request)
+        {
+            if (nullptr == gDeferredReq)
+            {
+                gDeferredReq = request;
             }
         });
 
@@ -162,6 +186,8 @@ void setup()
             /* Connect to wifi network. */
             (void)WiFi.begin(WIFI_STATION_SSID, WIFI_STATION_PASSWORD);
 
+            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "Total filesystem size: %u kb", SPIFFS.totalBytes() / 1024U);
+            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "Used filesystem size: %u kb", SPIFFS.usedBytes() / 1024U);
             ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "System is up.");
         }
     }
@@ -186,6 +212,19 @@ void loop()
             {
                 ESP_LOG_LEVEL(ESP_LOG_ERROR, LOG_MODULE, "Failed to set hostname.");
             }
+        }
+
+        /* Web request pending? */
+        if (nullptr != gDeferredReq)
+        {
+            String filename = gDeferredReq->url().substring(gDeferredReq->url().lastIndexOf("/") + 1U);
+            String path     = TEST_DATA_PATH + filename;
+
+            ++gNumberOfDownloads;
+            ESP_LOG_LEVEL(ESP_LOG_INFO, LOG_MODULE, "%u - %s requested (uc2).", gNumberOfDownloads, path.c_str());
+
+            gDeferredReq->send(SPIFFS, path, String(), true);
+            gDeferredReq = nullptr;
         }
     }
     else
